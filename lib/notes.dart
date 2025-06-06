@@ -13,18 +13,6 @@ void main() async {
   User? user = FirebaseAuth.instance.currentUser;
   if (user != null) {
     print("User is signed in: ${user.uid}");
-    // FirebaseFirestore.instance.collection('notes').add({
-    //   'title': 'First Note',
-    //   'content': 'This is my first Firestore note',
-    //   'timestamp': FieldValue.serverTimestamp(),
-    // });
-    FirebaseFirestore.instance.collection('notes').get().then((querySnapshot) {
-      for (var doc in querySnapshot.docs) {
-        print(doc.id); // document ID
-        print(doc['title']); // data field
-      }
-    });
-
   } else {
     print("No user signed in");
   }
@@ -84,7 +72,14 @@ class HomeState extends State<Home> {
       appBar: const AppBarWidget(),
       body: const HomeBody(),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => {Navigator.pushNamed(context, '/NotePage')},
+        onPressed: () async {
+          FirebaseFirestore.instance.collection('notes').add({
+            'title': '',
+            'description': '',
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+          Navigator.pushNamed(context, '/NotePage');
+        },
         backgroundColor: Colors.grey[200],
         shape: const CircleBorder(),
         child: Icon(Icons.add),
@@ -175,6 +170,7 @@ class HomeBodyState extends State<HomeBody> {
             itemCount: notes.length,
             itemBuilder: (context, index) {
               final doc = notes[index];
+              final id = doc.id;
               final title = doc['title'] ?? 'Untitled';
               final content = doc['content'] ?? '';
               final timestamp = doc['timestamp'];
@@ -182,6 +178,7 @@ class HomeBodyState extends State<HomeBody> {
               final String date = "${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}";
 
               return PressableGridItem(
+                id: id,
                 title: title,
                 description: content,
                 date: date,
@@ -195,11 +192,13 @@ class HomeBodyState extends State<HomeBody> {
 }
 
 class PressableGridItem extends StatefulWidget {
+  final String id;
   final String title;
   final String description;
   final String date;
 
   const PressableGridItem({
+    required this.id,
     required this.title,
     required this.description,
     required this.date,
@@ -230,7 +229,11 @@ class _PressableGridItemState extends State<PressableGridItem> {
             onTapUp: (_) => setState(() => isPressed = false),
             onTapCancel: () => setState(() => isPressed = false),
             onTap: () {
-              Navigator.pushNamed(context, '/NotePage');
+              Navigator.pushNamed(context, '/NotePage', arguments: {
+                'title': widget.title,
+                'description': widget.description,
+                'docId': widget.id,
+              });
             },
             child: Container(
               width: double.infinity,
