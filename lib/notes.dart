@@ -1,4 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import 'notePage.dart';
@@ -6,12 +8,46 @@ import 'notePage.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  if (Firebase.apps.isNotEmpty) {
-    print('Firebase already initialized');
+
+  await signIn('thungxeng@gmail.com', 'tttttt');
+  User? user = FirebaseAuth.instance.currentUser;
+  if (user != null) {
+    print("User is signed in: ${user.uid}");
+    // FirebaseFirestore.instance.collection('notes').add({
+    //   'title': 'First Note',
+    //   'content': 'This is my first Firestore note',
+    //   'timestamp': FieldValue.serverTimestamp(),
+    // });
+    FirebaseFirestore.instance.collection('notes').get().then((querySnapshot) {
+      for (var doc in querySnapshot.docs) {
+        print(doc.id); // document ID
+        print(doc['title']); // data field
+      }
+    });
+
   } else {
-    print('Firebase not initialized');
+    print("No user signed in");
   }
+
   runApp(const Application());
+}
+
+Future<UserCredential> signIn(String email, String password) async {
+  try {
+    UserCredential userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+    print("Signed in: ${userCredential.user?.uid}");
+    return userCredential;
+  } on FirebaseAuthException catch (e) {
+    if (e.code == 'user-not-found') {
+      print('No user found for that email.');
+    } else if (e.code == 'wrong-password') {
+      print('Wrong password provided.');
+    }
+    rethrow;
+  }
 }
 
 class Application extends StatelessWidget {
