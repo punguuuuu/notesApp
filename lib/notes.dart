@@ -84,7 +84,7 @@ class HomeState extends State<Home> {
       appBar: const AppBarWidget(),
       body: const HomeBody(),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => {},
+        onPressed: () => {Navigator.pushNamed(context, '/NotePage')},
         backgroundColor: Colors.grey[200],
         shape: const CircleBorder(),
         child: Icon(Icons.add),
@@ -147,24 +147,46 @@ class HomeBodyState extends State<HomeBody> {
 
     final itemWidth = (screenWidth - padding - spacing) / crossAxisCount;
     final itemHeight = 300;
-
     final childAspectRatio = itemWidth / itemHeight;
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: GridView.builder(
-        padding: const EdgeInsets.all(16),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: crossAxisCount,
-          crossAxisSpacing: spacing,
-          mainAxisSpacing: spacing,
-          childAspectRatio: childAspectRatio,
-        ),
-        itemCount: 6,
-        itemBuilder: (context, index) {
-          return PressableGridItem(
-            title: 'Widget ${index + 1}',
-            description: 'bla bla bla',
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance.collection('notes').orderBy('timestamp', descending: true).snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(child: Text('No notes found.'));
+          }
+
+          final notes = snapshot.data!.docs;
+
+          return GridView.builder(
+            padding: const EdgeInsets.all(16),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: spacing,
+              mainAxisSpacing: spacing,
+              childAspectRatio: childAspectRatio,
+            ),
+            itemCount: notes.length,
+            itemBuilder: (context, index) {
+              final doc = notes[index];
+              final title = doc['title'] ?? 'Untitled';
+              final content = doc['content'] ?? '';
+              final timestamp = doc['timestamp'];
+              DateTime dt = timestamp.toDate();
+              final String date = "${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}";
+
+              return PressableGridItem(
+                title: title,
+                description: content,
+                date: date,
+              );
+            },
           );
         },
       ),
@@ -175,10 +197,12 @@ class HomeBodyState extends State<HomeBody> {
 class PressableGridItem extends StatefulWidget {
   final String title;
   final String description;
+  final String date;
 
   const PressableGridItem({
     required this.title,
     required this.description,
+    required this.date,
     Key? key,
   }) : super(key: key);
 
@@ -214,11 +238,15 @@ class _PressableGridItemState extends State<PressableGridItem> {
                 color: isPressed ? Colors.grey[100] : Colors.grey[200],
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: const Center(child: Text('Content here')),
+              child: Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Text(widget.description, textAlign: TextAlign.center)),
+              )
             ),
           ),
         ),
-        Center(child: Text(widget.description)),
+        Center(child: Text(widget.date)),
       ],
     );
   }
