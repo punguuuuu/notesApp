@@ -21,6 +21,20 @@ Future<void> updateNote({
   }
 }
 
+Future<void> deleteNote({
+  required String docId,
+}) async {
+  try {
+    await FirebaseFirestore.instance
+        .collection('notes')
+        .doc(docId)
+        .delete();
+    print('Document deleted successfully');
+  } catch (e) {
+    print('Failed to delete document: $e');
+  }
+}
+
 class NotePage extends StatefulWidget {
   const NotePage({super.key});
 
@@ -75,6 +89,10 @@ class NotePageState extends State<NotePage> {
         ),
         actions: [
           IconButton(onPressed: () => {}, icon: Icon(Icons.dark_mode_outlined)),
+          IconButton(onPressed: () async {
+            await deleteNote(docId: id);
+            Navigator.pop(context);
+          }, icon: Icon(Icons.delete_outline)),
           Padding(
             padding: EdgeInsets.only(right: 16),
             child: IconButton(onPressed: () async {
