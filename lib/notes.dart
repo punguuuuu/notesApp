@@ -72,13 +72,16 @@ class HomeState extends State<Home> {
       appBar: const AppBarWidget(),
       body: const HomeBody(),
       floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          FirebaseFirestore.instance.collection('notes').add({
+        onPressed: () {
+          final docRef = FirebaseFirestore.instance.collection('notes').doc();
+          Navigator.pushNamed(context, '/NotePage', arguments: {
+            'docId': docRef.id,
+          });
+          docRef.set({
             'title': '',
             'description': '',
             'timestamp': FieldValue.serverTimestamp(),
           });
-          Navigator.pushNamed(context, '/NotePage');
         },
         backgroundColor: Colors.grey[200],
         shape: const CircleBorder(),
@@ -121,7 +124,6 @@ class HomeBody extends StatefulWidget {
 }
 
 class HomeBodyState extends State<HomeBody> {
-  bool isPressed = false;
   static final Color containerColor = Colors.grey[300]!;
   static const double containerHeight = 200;
 
@@ -137,17 +139,20 @@ class HomeBodyState extends State<HomeBody> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final padding = 16 * 2;
-    final double spacing = 16;
-    final crossAxisCount = 2;
+    const double spacing = 16;
+    const crossAxisCount = 2;
 
     final itemWidth = (screenWidth - padding - spacing) / crossAxisCount;
-    final itemHeight = 300;
+    const itemHeight = 300;
     final childAspectRatio = itemWidth / itemHeight;
 
     return Scaffold(
       backgroundColor: Colors.white,
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('notes').orderBy('timestamp', descending: true).snapshots(),
+        stream: FirebaseFirestore.instance
+            .collection('notes')
+            .orderBy('timestamp', descending: true)
+            .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -170,19 +175,7 @@ class HomeBodyState extends State<HomeBody> {
             itemCount: notes.length,
             itemBuilder: (context, index) {
               final doc = notes[index];
-              final id = doc.id;
-              final title = doc['title'] ?? 'Untitled';
-              final content = doc['content'] ?? '';
-              final timestamp = doc['timestamp'];
-              DateTime dt = timestamp.toDate();
-              final String date = "${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}";
-
-              return PressableGridItem(
-                id: id,
-                title: title,
-                description: content,
-                date: date,
-              );
+              return PressableGridItem(doc: doc);
             },
           );
         },
@@ -191,65 +184,52 @@ class HomeBodyState extends State<HomeBody> {
   }
 }
 
-class PressableGridItem extends StatefulWidget {
-  final String id;
-  final String title;
-  final String description;
-  final String date;
 
-  const PressableGridItem({
-    required this.id,
-    required this.title,
-    required this.description,
-    required this.date,
-    Key? key,
-  }) : super(key: key);
-
-  @override
-  State<PressableGridItem> createState() => _PressableGridItemState();
-}
-
-class _PressableGridItemState extends State<PressableGridItem> {
-  bool isPressed = false;
+class PressableGridItem extends StatelessWidget {
+  final DocumentSnapshot doc;
+  const PressableGridItem({required this.doc, Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final rawTitle = doc['title'] as String? ?? '';
+    final title = rawTitle.trim().isEmpty ? 'Untitled' : rawTitle;
+
+    final description = doc['description'] ?? '';
+    final timestamp = doc['timestamp'] as Timestamp?;
+    final dt = timestamp?.toDate() ?? DateTime.now();
+    final date = "${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}";
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Center(
-          child: Text(
-            widget.title,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
+          child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
         ),
         Expanded(
           child: GestureDetector(
-            onTapDown: (_) => setState(() => isPressed = true),
-            onTapUp: (_) => setState(() => isPressed = false),
-            onTapCancel: () => setState(() => isPressed = false),
             onTap: () {
               Navigator.pushNamed(context, '/NotePage', arguments: {
-                'title': widget.title,
-                'description': widget.description,
-                'docId': widget.id,
+                'title': title,
+                'description': description,
+                'docId': doc.id,
               });
             },
             child: Container(
               width: double.infinity,
               decoration: BoxDecoration(
-                color: isPressed ? Colors.grey[100] : Colors.grey[200],
+                color: Colors.grey[200],
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: Text(widget.description, textAlign: TextAlign.center)),
-              )
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(description, textAlign: TextAlign.center),
+                ),
+              ),
             ),
           ),
         ),
-        Center(child: Text(widget.date)),
+        Center(child: Text(date)),
       ],
     );
   }

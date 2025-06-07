@@ -53,7 +53,7 @@ class NotePageState extends State<NotePage> {
   @override
   Widget build(BuildContext context) {
     final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ?? {};
-    final String id = args['docId'];
+    final String id = args['docId'] ?? '';
     const placeHolder = 'Title';
 
     return Scaffold(
