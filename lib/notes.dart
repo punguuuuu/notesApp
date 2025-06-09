@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'dart:async';
 
 import 'notePage.dart';
 
@@ -91,8 +92,37 @@ class HomeState extends State<Home> {
   }
 }
 
-class AppBarWidget extends StatelessWidget implements PreferredSizeWidget {
-  const AppBarWidget({super.key});
+class AppBarWidget extends StatefulWidget implements PreferredSizeWidget {
+  const AppBarWidget({Key? key}) : super(key: key);
+
+  @override
+  AppBarWidgetState createState() => AppBarWidgetState();
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight + 60); // AppBar height + search bar height
+}
+
+class AppBarWidgetState extends State<AppBarWidget> {
+  TextEditingController _searchController = TextEditingController();
+  String searchText = "";
+  Timer? _debounce;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  void performSearch(String value) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      setState(() {
+        searchText = value;
+      });
+      print("Search text: $value");
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -103,17 +133,37 @@ class AppBarWidget extends StatelessWidget implements PreferredSizeWidget {
       ),
       backgroundColor: Colors.white,
       actions: [
-        IconButton(onPressed: () => {}, icon: Icon(Icons.dark_mode_outlined)),
         Padding(
           padding: EdgeInsets.only(right: 16),
-          child: IconButton(onPressed: () => {}, icon: Icon(Icons.search)),
+          child: IconButton(onPressed: () => {}, icon: Icon(Icons.dark_mode_outlined)),
         ),
       ],
+    bottom: PreferredSize(
+      preferredSize: Size.fromHeight(56.0),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: TextField(
+          controller: _searchController,
+          decoration: InputDecoration(
+            hintText: 'Search here',
+            prefixIcon: GestureDetector(
+              onTap: () => performSearch(_searchController.text),
+              child: const Icon(Icons.search),
+            ),
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: EdgeInsets.symmetric(vertical: 0),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(30.0),
+              borderSide: BorderSide.none,
+            ),
+          ),
+          onChanged: performSearch
+        ),
+        ),
+      ),
     );
   }
-
-  @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 }
 
 class HomeBody extends StatefulWidget {
