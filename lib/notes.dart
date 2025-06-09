@@ -67,11 +67,19 @@ class Home extends StatefulWidget {
 }
 
 class HomeState extends State<Home> {
+  String searchText = "";
+
+  void updateSearchText(String newText) {
+    setState(() {
+      searchText = newText;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const AppBarWidget(),
-      body: const HomeBody(),
+      appBar: AppBarWidget(onSearchChanged: updateSearchText),
+      body: HomeBody(searchText: searchText),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           final docRef = FirebaseFirestore.instance.collection('notes').doc();
@@ -80,6 +88,7 @@ class HomeState extends State<Home> {
           });
           docRef.set({
             'title': '',
+            'titleLower': '',
             'description': '',
             'timestamp': FieldValue.serverTimestamp(),
           });
@@ -93,13 +102,15 @@ class HomeState extends State<Home> {
 }
 
 class AppBarWidget extends StatefulWidget implements PreferredSizeWidget {
-  const AppBarWidget({Key? key}) : super(key: key);
+  final Function(String) onSearchChanged;
+
+  const AppBarWidget({Key? key, required this.onSearchChanged}) : super(key: key);
 
   @override
   AppBarWidgetState createState() => AppBarWidgetState();
 
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight + 60); // AppBar height + search bar height
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight + 60);
 }
 
 class AppBarWidgetState extends State<AppBarWidget> {
@@ -117,10 +128,7 @@ class AppBarWidgetState extends State<AppBarWidget> {
   void performSearch(String value) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 300), () {
-      setState(() {
-        searchText = value;
-      });
-      print("Search text: $value");
+      widget.onSearchChanged(value);
     });
   }
 
@@ -167,7 +175,8 @@ class AppBarWidgetState extends State<AppBarWidget> {
 }
 
 class HomeBody extends StatefulWidget {
-  const HomeBody({super.key});
+  final String searchText;
+  const HomeBody({super.key, required this.searchText});
 
   @override
   HomeBodyState createState() => HomeBodyState();
@@ -177,13 +186,18 @@ class HomeBodyState extends State<HomeBody> {
   static final Color containerColor = Colors.grey[300]!;
   static const double containerHeight = 200;
 
-  List<Widget> listOfWidgets = [
-    Container(
-      color: containerColor,
-      height: containerHeight,
-      child: Center(child: Text('Widget 1')),
-    ),
-  ];
+  Stream<QuerySnapshot> getNotesStream() {
+    final collection = FirebaseFirestore.instance.collection('notes');
+
+    if (widget.searchText.isNotEmpty) {
+      return collection
+          .where('titleLower', isGreaterThanOrEqualTo: widget.searchText.toLowerCase())
+          .where('titleLower', isLessThanOrEqualTo: '${widget.searchText.toLowerCase()}\uf8ff')
+          .snapshots();
+    } else {
+      return collection.orderBy('timestamp', descending: true).snapshots();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -199,10 +213,7 @@ class HomeBodyState extends State<HomeBody> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('notes')
-            .orderBy('timestamp', descending: true)
-            .snapshots(),
+        stream: getNotesStream(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -278,6 +289,7 @@ class PressableGridItem extends StatelessWidget {
             onTap: () {
               Navigator.pushNamed(context, '/NotePage', arguments: {
                 'title': title,
+                'titleLower':title.toLowerCase(),
                 'description': description,
                 'docId': doc.id,
               });

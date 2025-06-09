@@ -12,6 +12,7 @@ Future<void> updateNote({
         .doc(docId)
         .update({
       'title': title,
+      'titleLower': title.toLowerCase(),
       'description': description,
       'timestamp': Timestamp.now(),
     });
