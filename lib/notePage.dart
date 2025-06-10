@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'main.dart';
+
 Future<void> updateNote({
   required String docId,
   required String title,
@@ -47,6 +49,11 @@ class NotePageState extends State<NotePage> {
   late TextEditingController titleController;
   late TextEditingController descriptionController;
 
+  void toggleTheme() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    themeNotifier.value = isDark ? ThemeMode.light : ThemeMode.dark;
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -67,6 +74,8 @@ class NotePageState extends State<NotePage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ?? {};
     final String id = args['docId'] ?? '';
     const placeHolder = 'Title';
@@ -89,7 +98,9 @@ class NotePageState extends State<NotePage> {
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
         ),
         actions: [
-          IconButton(onPressed: () => {}, icon: Icon(Icons.dark_mode_outlined)),
+          IconButton(onPressed: () => {
+            toggleTheme()
+          }, icon: Icon(isDark ? Icons.dark_mode : Icons.dark_mode_outlined)),
           IconButton(onPressed: () async {
             await deleteNote(docId: id);
             Navigator.pop(context);
@@ -103,7 +114,8 @@ class NotePageState extends State<NotePage> {
         ],
       ),
       body: SizedBox.expand(
-        child: Padding(
+        child: Container(
+          color: Theme.of(context).appBarTheme.backgroundColor,
           padding: const EdgeInsets.all(16),
           child: TextField(
             controller: descriptionController,

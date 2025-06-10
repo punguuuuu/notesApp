@@ -1,25 +1,10 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 
+import 'main.dart';
 import 'notePage.dart';
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-
-  await signIn('thungxeng@gmail.com', 'tttttt');
-  User? user = FirebaseAuth.instance.currentUser;
-  if (user != null) {
-    print("User is signed in: ${user.uid}");
-  } else {
-    print("No user signed in");
-  }
-
-  runApp(const Application());
-}
 
 Future<UserCredential> signIn(String email, String password) async {
   try {
@@ -36,26 +21,6 @@ Future<UserCredential> signIn(String email, String password) async {
       print('Wrong password provided.');
     }
     rethrow;
-  }
-}
-
-class Application extends StatelessWidget {
-  const Application({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Notes',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.black12),
-      ),
-      debugShowCheckedModeBanner: false,
-      initialRoute: '/',
-      routes: {
-        '/': (context) => const Home(),
-        '/NotePage': (context) => const NotePage(),
-      },
-    );
   }
 }
 
@@ -77,6 +42,7 @@ class HomeState extends State<Home> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       appBar: AppBarWidget(onSearchChanged: updateSearchText),
       body: HomeBody(searchText: searchText),
@@ -93,7 +59,7 @@ class HomeState extends State<Home> {
             'timestamp': FieldValue.serverTimestamp(),
           });
         },
-        backgroundColor: Colors.grey[200],
+        backgroundColor: isDark ? Colors.black12 : Colors.grey[200],
         shape: const CircleBorder(),
         child: Icon(Icons.add),
       ),
@@ -110,7 +76,7 @@ class AppBarWidget extends StatefulWidget implements PreferredSizeWidget {
   AppBarWidgetState createState() => AppBarWidgetState();
 
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight + 60);
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight + 80);
 }
 
 class AppBarWidgetState extends State<AppBarWidget> {
@@ -132,18 +98,28 @@ class AppBarWidgetState extends State<AppBarWidget> {
     });
   }
 
+  void toggleTheme() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    themeNotifier.value = isDark ? ThemeMode.light : ThemeMode.dark;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return AppBar(
       title: Padding(
-        padding: EdgeInsets.only(left: 16),
-        child: Text('Folders'),
+        padding: EdgeInsets.only(top: 30, left: 16),
+        child: Text('Folders', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 28),),
       ),
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+      foregroundColor: Theme.of(context).appBarTheme.foregroundColor,
       actions: [
         Padding(
-          padding: EdgeInsets.only(right: 16),
-          child: IconButton(onPressed: () => {}, icon: Icon(Icons.dark_mode_outlined)),
+          padding: EdgeInsets.only(top: 20, right: 16),
+          child: IconButton(onPressed: () => {
+            toggleTheme()
+          }, icon: Icon(isDark ? Icons.dark_mode : Icons.dark_mode_outlined)),
         ),
       ],
     bottom: PreferredSize(
@@ -159,7 +135,7 @@ class AppBarWidgetState extends State<AppBarWidget> {
               child: const Icon(Icons.search),
             ),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: isDark ? Colors.black12 : Colors.white,
             contentPadding: EdgeInsets.symmetric(vertical: 0),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(30.0),
@@ -211,7 +187,7 @@ class HomeBodyState extends State<HomeBody> {
     final childAspectRatio = itemWidth / itemHeight;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
       body: StreamBuilder<QuerySnapshot>(
         stream: getNotesStream(),
         builder: (context, snapshot) {
@@ -252,6 +228,8 @@ class PressableGridItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final rawTitle = doc['title'] as String? ?? '';
     final title = rawTitle.trim().isEmpty ? 'Untitled' : rawTitle;
 
@@ -297,7 +275,7 @@ class PressableGridItem extends StatelessWidget {
             child: Container(
               width: double.infinity,
               decoration: BoxDecoration(
-                color: Colors.grey[200],
+                color: isDark ? Colors.black26 : Colors.grey[200],
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Center(
