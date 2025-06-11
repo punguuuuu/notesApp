@@ -125,7 +125,7 @@ class NotePageState extends State<NotePage> {
         },
         backgroundColor: isDark ? Colors.black12 : Colors.grey[200],
         shape: const CircleBorder(),
-        child: Icon(Icons.draw_outlined),
+        child: Icon(isDrawing ? Icons.text_fields : Icons.brush),
       ),
       body: Stack(
         children: [
@@ -167,6 +167,49 @@ class NotePageState extends State<NotePage> {
               ),
             ),
           ),
+
+          if (isDrawing)
+            Positioned(
+              bottom: 100,
+              right: 20,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.edit),
+                    onPressed: () {
+                      // change brush
+                    },
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.palette),
+                    onPressed: () {
+                      // change brush
+                    },
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.redo),
+                    onPressed: () {
+                      // change brush
+                    },
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.undo),
+                    onPressed: () {
+                      // change color
+                    },
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.refresh),
+                    onPressed: () {
+                      setState(() {
+                        points.clear();
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
