@@ -52,6 +52,7 @@ class NotePageState extends State<NotePage> {
   bool isDrawing = false;
   final GlobalKey _paintKey = GlobalKey();
   final List<Offset?> points = [];
+  final List<Offset?> tempPoints = [];
 
   void toggleTheme() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -150,11 +151,20 @@ class NotePageState extends State<NotePage> {
           IgnorePointer(
             ignoring: !isDrawing,
             child: GestureDetector(
+              onPanStart: (details) {
+                final RenderBox box = _paintKey.currentContext?.findRenderObject() as RenderBox;
+                final local = box.globalToLocal(details.globalPosition);
+                setState(() {
+                  points.add(null);
+                  points.add(local);
+                });
+              },
               onPanUpdate: (details) {
-                final box = _paintKey.currentContext?.findRenderObject() as RenderBox;
+                final RenderBox box = _paintKey.currentContext?.findRenderObject() as RenderBox;
                 final local = box.globalToLocal(details.globalPosition);
                 setState(() {
                   points.add(local);
+                  tempPoints.clear();
                 });
               },
               onPanEnd: (_) => setState(() => points.add(null)),
@@ -190,14 +200,47 @@ class NotePageState extends State<NotePage> {
                   IconButton(
                     icon: Icon(Icons.redo),
                     onPressed: () {
-                      // change brush
-                    },
+                      setState(() {
+                        if (tempPoints.isEmpty) return;
+
+                        List<Offset?> redoStroke = [];
+
+                        if (tempPoints.last == null) {
+                          redoStroke.insert(0, tempPoints.removeLast());
+                        }
+
+                        while (tempPoints.isNotEmpty) {
+                          final last = tempPoints.removeLast();
+                          redoStroke.insert(0, last);
+                          if (last == null) break;
+                        }
+                        points.addAll(redoStroke);
+                      });
+                    }
                   ),
                   IconButton(
                     icon: Icon(Icons.undo),
                     onPressed: () {
-                      // change color
-                    },
+                      setState(() {
+                        if (points.isEmpty) return;
+
+                        List<Offset?> removedStroke = [];
+
+                        if (points.last == null) {
+                          removedStroke.insert(0, points.removeLast());
+                        }
+
+                        while (points.isNotEmpty) {
+                          final last = points.removeLast();
+                          removedStroke.insert(0, last);
+
+                          if (last == null) {
+                            break;
+                          }
+                        }
+                        tempPoints.addAll(removedStroke);
+                      });
+                    }
                   ),
                   IconButton(
                     icon: Icon(Icons.refresh),
