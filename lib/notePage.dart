@@ -141,7 +141,24 @@ class _DrawingTextFieldOverlayState extends State<DrawingTextFieldOverlay> {
   final GlobalKey _paintKey = GlobalKey();
   final List<Offset?> points = [];
   final List<Offset?> tempPoints = [];
+
   bool isDrawing = false;
+  bool isChangingColor = false;
+  bool isChangingSize = false;
+
+  double brushSize = 3.0;
+
+  List<Color> colors = [
+    Colors.black,
+    Colors.red,
+    Colors.green,
+    Colors.blue,
+    Colors.orange,
+    Colors.purple,
+    Colors.yellow,
+  ];
+
+  Color selectedColor = Colors.black;
 
   @override
   Widget build(BuildContext context) {
@@ -185,7 +202,7 @@ class _DrawingTextFieldOverlayState extends State<DrawingTextFieldOverlay> {
             onPanEnd: (_) => setState(() => points.add(null)),
             child: CustomPaint(
               key: _paintKey,
-              painter: DrawingPainter(List.from(points)),
+              painter: DrawingPainter(List.from(points), selectedColor, brushSize),
               child: SizedBox.expand(
                 child: Container(color: Colors.transparent),
               ),
@@ -195,7 +212,7 @@ class _DrawingTextFieldOverlayState extends State<DrawingTextFieldOverlay> {
 
         if (isDrawing)
           Positioned(
-            bottom: 28,
+            bottom: 34,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               spacing: 12,
@@ -204,13 +221,19 @@ class _DrawingTextFieldOverlayState extends State<DrawingTextFieldOverlay> {
                 IconButton(
                   icon: const Icon(Icons.edit),
                   onPressed: () {
-                    // change brush
+                    setState(() {
+                      isChangingSize = !isChangingSize;
+                      isChangingColor = false;
+                    });
                   },
                 ),
                 IconButton(
                   icon: const Icon(Icons.palette),
                   onPressed: () {
-                    // change brush
+                    setState(() {
+                      isChangingColor = !isChangingColor;
+                      isChangingSize = false;
+                    });
                   },
                 ),
                 IconButton(
@@ -268,12 +291,14 @@ class _DrawingTextFieldOverlayState extends State<DrawingTextFieldOverlay> {
           ),
 
         Positioned(
-          bottom: 24,
+          bottom: 30,
           right: 24,
           child: FloatingActionButton(
             onPressed: () {
               setState(() {
                 isDrawing = !isDrawing;
+                isChangingColor = false;
+                isChangingSize = false;
               });
             },
             backgroundColor: widget.isDark ? Colors.black12 : Colors.grey[200],
@@ -281,6 +306,72 @@ class _DrawingTextFieldOverlayState extends State<DrawingTextFieldOverlay> {
             child: Icon(isDrawing ? Icons.text_fields : Icons.brush),
           ),
         ),
+
+      if (isChangingSize)
+        Positioned(
+          bottom: 90,
+          left: 20,
+          right: 0,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                const Text(
+                  'Width:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Expanded(
+                  child: Slider(
+                    min: 1.0,
+                    max: 20.0,
+                    value: brushSize,
+                    label: brushSize.toStringAsFixed(1),
+                    onChanged: (value) {
+                      setState(() {
+                        brushSize = value;
+                      });
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        if (isChangingColor)
+          Positioned(
+            bottom: 90,
+            left: 16,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                spacing: 20,
+                children: colors.map((color) {
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        selectedColor = color;
+                      });
+                    },
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: selectedColor == color ? Colors.black : Colors.transparent,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -288,13 +379,16 @@ class _DrawingTextFieldOverlayState extends State<DrawingTextFieldOverlay> {
 
 class DrawingPainter extends CustomPainter {
   final List<Offset?> points;
-  DrawingPainter(this.points);
+  final Color color;
+  final double strokeWidth;
+
+  DrawingPainter(this.points, this.color, this.strokeWidth);
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.red
-      ..strokeWidth = 3
+      ..color = color
+      ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
 
     for (int i = 0; i < points.length - 1; i++) {
@@ -308,6 +402,8 @@ class DrawingPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant DrawingPainter oldDelegate) {
-    return oldDelegate.points != points;
+    return oldDelegate.points != points ||
+        oldDelegate.color != color ||
+        oldDelegate.strokeWidth != strokeWidth;
   }
 }
