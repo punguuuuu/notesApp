@@ -171,7 +171,7 @@ class NotePageState extends State<NotePage> {
           if (isDrawing)
             Positioned(
               bottom: 100,
-              right: 20,
+              right: 21,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
