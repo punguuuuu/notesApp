@@ -50,9 +50,6 @@ class NotePageState extends State<NotePage> {
   late TextEditingController descriptionController;
 
   bool isDrawing = false;
-  final GlobalKey _paintKey = GlobalKey();
-  final List<Offset?> points = [];
-  final List<Offset?> tempPoints = [];
 
   void toggleTheme() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -118,147 +115,176 @@ class NotePageState extends State<NotePage> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          setState(() {
-            isDrawing = !isDrawing;
-          });
-        },
-        backgroundColor: isDark ? Colors.black12 : Colors.grey[200],
-        shape: const CircleBorder(),
-        child: Icon(isDrawing ? Icons.text_fields : Icons.brush),
-      ),
-      body: Stack(
-        children: [
-          // TextField Layer
-          SizedBox.expand(
-            child: Container(
-              color: Theme.of(context).appBarTheme.backgroundColor,
-              padding: const EdgeInsets.all(16),
-              child: TextField(
-                controller: descriptionController,
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                ),
-                style: const TextStyle(fontSize: 20),
-                maxLines: null,
-                keyboardType: TextInputType.multiline,
-              ),
-            ),
-          ),
-
-          // Drawing Layer
-          IgnorePointer(
-            ignoring: !isDrawing,
-            child: GestureDetector(
-              onPanStart: (details) {
-                final RenderBox box = _paintKey.currentContext?.findRenderObject() as RenderBox;
-                final local = box.globalToLocal(details.globalPosition);
-                setState(() {
-                  points.add(null);
-                  points.add(local);
-                });
-              },
-              onPanUpdate: (details) {
-                final RenderBox box = _paintKey.currentContext?.findRenderObject() as RenderBox;
-                final local = box.globalToLocal(details.globalPosition);
-                setState(() {
-                  points.add(local);
-                  tempPoints.clear();
-                });
-              },
-              onPanEnd: (_) => setState(() => points.add(null)),
-              child: CustomPaint(
-                key: _paintKey,
-                painter: DrawingPainter(List.from(points)),
-                child: SizedBox.expand(
-                  child: Container(color: Colors.transparent),
-                ),
-              ),
-            ),
-          ),
-
-          if (isDrawing)
-            Positioned(
-              bottom: 100,
-              right: 21,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.edit),
-                    onPressed: () {
-                      // change brush
-                    },
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.palette),
-                    onPressed: () {
-                      // change brush
-                    },
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.redo),
-                    onPressed: () {
-                      setState(() {
-                        if (tempPoints.isEmpty) return;
-
-                        List<Offset?> redoStroke = [];
-
-                        if (tempPoints.last == null) {
-                          redoStroke.insert(0, tempPoints.removeLast());
-                        }
-
-                        while (tempPoints.isNotEmpty) {
-                          final last = tempPoints.removeLast();
-                          redoStroke.insert(0, last);
-                          if (last == null) break;
-                        }
-                        points.addAll(redoStroke);
-                      });
-                    }
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.undo),
-                    onPressed: () {
-                      setState(() {
-                        if (points.isEmpty) return;
-
-                        List<Offset?> removedStroke = [];
-
-                        if (points.last == null) {
-                          removedStroke.insert(0, points.removeLast());
-                        }
-
-                        while (points.isNotEmpty) {
-                          final last = points.removeLast();
-                          removedStroke.insert(0, last);
-
-                          if (last == null) {
-                            break;
-                          }
-                        }
-                        tempPoints.addAll(removedStroke);
-                      });
-                    }
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.refresh),
-                    onPressed: () {
-                      setState(() {
-                        points.clear();
-                      });
-                    },
-                  ),
-                ],
-              ),
-            ),
-        ],
+      body: DrawingTextFieldOverlay(
+        descriptionController: descriptionController,
+        isDark: Theme.of(context).brightness == Brightness.dark,
       ),
     );
   }
 }
 
+class DrawingTextFieldOverlay extends StatefulWidget {
+  final TextEditingController descriptionController;
+  final bool isDark;
+
+  const DrawingTextFieldOverlay({
+    super.key,
+    required this.descriptionController,
+    this.isDark = false,
+  });
+
+  @override
+  State<DrawingTextFieldOverlay> createState() => _DrawingTextFieldOverlayState();
+}
+
+class _DrawingTextFieldOverlayState extends State<DrawingTextFieldOverlay> {
+  final GlobalKey _paintKey = GlobalKey();
+  final List<Offset?> points = [];
+  final List<Offset?> tempPoints = [];
+  bool isDrawing = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        // TextField Layer
+        SizedBox.expand(
+          child: Container(
+            color: Theme.of(context).appBarTheme.backgroundColor,
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              controller: widget.descriptionController,
+              decoration: const InputDecoration(border: InputBorder.none),
+              style: const TextStyle(fontSize: 20),
+              maxLines: null,
+              keyboardType: TextInputType.multiline,
+            ),
+          ),
+        ),
+
+        // Drawing Layer
+        IgnorePointer(
+          ignoring: !isDrawing,
+          child: GestureDetector(
+            onPanStart: (details) {
+              final RenderBox box = _paintKey.currentContext?.findRenderObject() as RenderBox;
+              final local = box.globalToLocal(details.globalPosition);
+              setState(() {
+                points.add(null);
+                points.add(local);
+              });
+            },
+            onPanUpdate: (details) {
+              final RenderBox box = _paintKey.currentContext?.findRenderObject() as RenderBox;
+              final local = box.globalToLocal(details.globalPosition);
+              setState(() {
+                points.add(local);
+                tempPoints.clear();
+              });
+            },
+            onPanEnd: (_) => setState(() => points.add(null)),
+            child: CustomPaint(
+              key: _paintKey,
+              painter: DrawingPainter(List.from(points)),
+              child: SizedBox.expand(
+                child: Container(color: Colors.transparent),
+              ),
+            ),
+          ),
+        ),
+
+        if (isDrawing)
+          Positioned(
+            bottom: 28,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              spacing: 12,
+              children: [
+                const SizedBox(width: 16),
+                IconButton(
+                  icon: const Icon(Icons.edit),
+                  onPressed: () {
+                    // change brush
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.palette),
+                  onPressed: () {
+                    // change brush
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.undo),
+                  onPressed: () {
+                    setState(() {
+                      if (points.isEmpty) return;
+
+                      List<Offset?> removedStroke = [];
+
+                      if (points.last == null) {
+                        removedStroke.insert(0, points.removeLast());
+                      }
+
+                      while (points.isNotEmpty) {
+                        final last = points.removeLast();
+                        removedStroke.insert(0, last);
+                        if (last == null) break;
+                      }
+                      tempPoints.addAll(removedStroke);
+                    });
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.redo),
+                  onPressed: () {
+                    setState(() {
+                      if (tempPoints.isEmpty) return;
+
+                      List<Offset?> redoStroke = [];
+
+                      if (tempPoints.last == null) {
+                        redoStroke.insert(0, tempPoints.removeLast());
+                      }
+
+                      while (tempPoints.isNotEmpty) {
+                        final last = tempPoints.removeLast();
+                        redoStroke.insert(0, last);
+                        if (last == null) break;
+                      }
+                      points.addAll(redoStroke);
+                    });
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () {
+                    setState(() {
+                      points.clear();
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+
+        Positioned(
+          bottom: 24,
+          right: 24,
+          child: FloatingActionButton(
+            onPressed: () {
+              setState(() {
+                isDrawing = !isDrawing;
+              });
+            },
+            backgroundColor: widget.isDark ? Colors.black12 : Colors.grey[200],
+            shape: const CircleBorder(),
+            child: Icon(isDrawing ? Icons.text_fields : Icons.brush),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class DrawingPainter extends CustomPainter {
   final List<Offset?> points;
