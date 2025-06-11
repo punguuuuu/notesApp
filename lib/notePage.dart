@@ -49,6 +49,10 @@ class NotePageState extends State<NotePage> {
   late TextEditingController titleController;
   late TextEditingController descriptionController;
 
+  bool isDrawing = false;
+  final GlobalKey _paintKey = GlobalKey();
+  final List<Offset?> points = [];
+
   void toggleTheme() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     themeNotifier.value = isDark ? ThemeMode.light : ThemeMode.dark;
@@ -113,21 +117,85 @@ class NotePageState extends State<NotePage> {
           ),
         ],
       ),
-      body: SizedBox.expand(
-        child: Container(
-          color: Theme.of(context).appBarTheme.backgroundColor,
-          padding: const EdgeInsets.all(16),
-          child: TextField(
-            controller: descriptionController,
-            decoration: const InputDecoration(
-              border: InputBorder.none,
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          setState(() {
+            isDrawing = !isDrawing;
+          });
+        },
+        backgroundColor: isDark ? Colors.black12 : Colors.grey[200],
+        shape: const CircleBorder(),
+        child: Icon(Icons.draw_outlined),
+      ),
+      body: Stack(
+        children: [
+          // TextField Layer
+          SizedBox.expand(
+            child: Container(
+              color: Theme.of(context).appBarTheme.backgroundColor,
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: descriptionController,
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                ),
+                style: const TextStyle(fontSize: 20),
+                maxLines: null,
+                keyboardType: TextInputType.multiline,
+              ),
             ),
-            style: const TextStyle(fontSize: 20),
-            maxLines: null,
-            keyboardType: TextInputType.multiline,
           ),
-        ),
+
+          // Drawing Layer
+          IgnorePointer(
+            ignoring: !isDrawing,
+            child: GestureDetector(
+              onPanUpdate: (details) {
+                final box = _paintKey.currentContext?.findRenderObject() as RenderBox;
+                final local = box.globalToLocal(details.globalPosition);
+                setState(() {
+                  points.add(local);
+                });
+              },
+              onPanEnd: (_) => setState(() => points.add(null)),
+              child: CustomPaint(
+                key: _paintKey,
+                painter: DrawingPainter(List.from(points)),
+                child: SizedBox.expand(
+                  child: Container(color: Colors.transparent),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
+  }
+}
+
+
+class DrawingPainter extends CustomPainter {
+  final List<Offset?> points;
+  DrawingPainter(this.points);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.red
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+
+    for (int i = 0; i < points.length - 1; i++) {
+      final p1 = points[i];
+      final p2 = points[i + 1];
+      if (p1 != null && p2 != null) {
+        canvas.drawLine(p1, p2, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant DrawingPainter oldDelegate) {
+    return oldDelegate.points != points;
   }
 }
