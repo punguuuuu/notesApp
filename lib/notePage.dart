@@ -139,13 +139,16 @@ class DrawingTextFieldOverlay extends StatefulWidget {
 
 class _DrawingTextFieldOverlayState extends State<DrawingTextFieldOverlay> {
   final GlobalKey _paintKey = GlobalKey();
-  final List<Offset?> points = [];
-  final List<Offset?> tempPoints = [];
 
   bool isDrawing = false;
   bool isChangingColor = false;
   bool isChangingSize = false;
 
+  List<Stroke> strokes = [];
+  List<Stroke> redoStrokes = [];
+  List<Offset> currentPoints = [];
+
+  Color selectedColor = Colors.black;
   double brushSize = 3.0;
 
   List<Color> colors = [
@@ -157,8 +160,6 @@ class _DrawingTextFieldOverlayState extends State<DrawingTextFieldOverlay> {
     Colors.purple,
     Colors.yellow,
   ];
-
-  Color selectedColor = Colors.black;
 
   @override
   Widget build(BuildContext context) {
@@ -184,25 +185,45 @@ class _DrawingTextFieldOverlayState extends State<DrawingTextFieldOverlay> {
           ignoring: !isDrawing,
           child: GestureDetector(
             onPanStart: (details) {
-              final RenderBox box = _paintKey.currentContext?.findRenderObject() as RenderBox;
+              final box = _paintKey.currentContext?.findRenderObject();
+              if (box is! RenderBox) return;
+
               final local = box.globalToLocal(details.globalPosition);
               setState(() {
-                points.add(null);
-                points.add(local);
+                currentPoints = [local];
               });
             },
             onPanUpdate: (details) {
-              final RenderBox box = _paintKey.currentContext?.findRenderObject() as RenderBox;
-              final local = box.globalToLocal(details.globalPosition);
+              final context = _paintKey.currentContext;
+              if (context == null) return;
+              final renderObject = context.findRenderObject();
+              if (renderObject is! RenderBox) return;
+
+              final local = renderObject.globalToLocal(details.globalPosition);
               setState(() {
-                points.add(local);
-                tempPoints.clear();
+                currentPoints.add(local);
               });
             },
-            onPanEnd: (_) => setState(() => points.add(null)),
+            onPanEnd: (_) {
+              if (currentPoints.isEmpty) return;
+              setState(() {
+                strokes.add(Stroke(
+                  points: List.from(currentPoints),
+                  color: selectedColor,
+                  strokeWidth: brushSize,
+                ));
+                currentPoints.clear();
+                redoStrokes.clear();
+              });
+            },
             child: CustomPaint(
               key: _paintKey,
-              painter: DrawingPainter(List.from(points), selectedColor, brushSize),
+              painter: DrawingPainter(
+                strokes: strokes,
+                currentPoints: currentPoints,
+                currentColor: selectedColor,
+                currentStrokeWidth: brushSize,
+              ),
               child: SizedBox.expand(
                 child: Container(color: Colors.transparent),
               ),
@@ -240,49 +261,31 @@ class _DrawingTextFieldOverlayState extends State<DrawingTextFieldOverlay> {
                   icon: const Icon(Icons.undo),
                   onPressed: () {
                     setState(() {
-                      if (points.isEmpty) return;
-
-                      List<Offset?> removedStroke = [];
-
-                      if (points.last == null) {
-                        removedStroke.insert(0, points.removeLast());
+                      if (strokes.isNotEmpty) {
+                        setState(() {
+                          redoStrokes.add(strokes.removeLast());
+                        });
                       }
-
-                      while (points.isNotEmpty) {
-                        final last = points.removeLast();
-                        removedStroke.insert(0, last);
-                        if (last == null) break;
-                      }
-                      tempPoints.addAll(removedStroke);
                     });
                   },
                 ),
                 IconButton(
                   icon: const Icon(Icons.redo),
                   onPressed: () {
-                    setState(() {
-                      if (tempPoints.isEmpty) return;
-
-                      List<Offset?> redoStroke = [];
-
-                      if (tempPoints.last == null) {
-                        redoStroke.insert(0, tempPoints.removeLast());
-                      }
-
-                      while (tempPoints.isNotEmpty) {
-                        final last = tempPoints.removeLast();
-                        redoStroke.insert(0, last);
-                        if (last == null) break;
-                      }
-                      points.addAll(redoStroke);
-                    });
+                    if (redoStrokes.isNotEmpty) {
+                      setState(() {
+                        strokes.add(redoStrokes.removeLast());
+                      });
+                    }
                   },
                 ),
                 IconButton(
                   icon: const Icon(Icons.refresh),
                   onPressed: () {
                     setState(() {
-                      points.clear();
+                      currentPoints.clear();
+                      strokes.clear();
+                      redoStrokes.clear();
                     });
                   },
                 ),
@@ -377,33 +380,52 @@ class _DrawingTextFieldOverlayState extends State<DrawingTextFieldOverlay> {
   }
 }
 
-class DrawingPainter extends CustomPainter {
-  final List<Offset?> points;
+class Stroke {
+  final List<Offset> points;
   final Color color;
   final double strokeWidth;
 
-  DrawingPainter(this.points, this.color, this.strokeWidth);
+  Stroke({required this.points, required this.color, required this.strokeWidth});
+}
+
+class DrawingPainter extends CustomPainter {
+  final List<Stroke> strokes;
+  final List<Offset> currentPoints;
+  final Color currentColor;
+  final double currentStrokeWidth;
+
+  DrawingPainter({
+    required this.strokes,
+    required this.currentPoints,
+    required this.currentColor,
+    required this.currentStrokeWidth,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
+    for (var stroke in strokes) {
+      final paint = Paint()
+        ..color = stroke.color
+        ..strokeWidth = stroke.strokeWidth
+        ..strokeCap = StrokeCap.round;
 
-    for (int i = 0; i < points.length - 1; i++) {
-      final p1 = points[i];
-      final p2 = points[i + 1];
-      if (p1 != null && p2 != null) {
-        canvas.drawLine(p1, p2, paint);
+      for (int i = 0; i < stroke.points.length - 1; i++) {
+        canvas.drawLine(stroke.points[i], stroke.points[i + 1], paint);
+      }
+    }
+
+    if (currentPoints.length > 1) {
+      final paint = Paint()
+        ..color = currentColor
+        ..strokeWidth = currentStrokeWidth
+        ..strokeCap = StrokeCap.round;
+
+      for (int i = 0; i < currentPoints.length - 1; i++) {
+        canvas.drawLine(currentPoints[i], currentPoints[i + 1], paint);
       }
     }
   }
 
   @override
-  bool shouldRepaint(covariant DrawingPainter oldDelegate) {
-    return oldDelegate.points != points ||
-        oldDelegate.color != color ||
-        oldDelegate.strokeWidth != strokeWidth;
-  }
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
