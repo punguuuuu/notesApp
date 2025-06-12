@@ -21,7 +21,6 @@ Future<void> updateNote({
       'content': drawingData,
       'timestamp': Timestamp.now(),
     });
-    print('Document updated successfully');
   } catch (e) {
     print('Failed to update document: $e');
   }
@@ -35,7 +34,6 @@ Future<void> deleteNote({
         .collection('notes')
         .doc(docId)
         .delete();
-    print('Document deleted successfully');
   } catch (e) {
     print('Failed to delete document: $e');
   }
