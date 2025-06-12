@@ -189,6 +189,7 @@ class _DrawingTextFieldOverlayState extends State<DrawingTextFieldOverlay> {
 
   List<Color> colors = [
     Colors.black,
+    Colors.white,
     Colors.red,
     Colors.green,
     Colors.blue,
@@ -377,15 +378,11 @@ class _DrawingTextFieldOverlayState extends State<DrawingTextFieldOverlay> {
                       });
                     },
                     child: Container(
-                      width: 32,
-                      height: 32,
+                      width: selectedColor == color ? 16 : 24,
+                      height: selectedColor == color ? 16 : 24,
                       decoration: BoxDecoration(
                         color: color,
                         shape: BoxShape.circle,
-                        border: Border.all(
-                          color: selectedColor == color ? Colors.black : Colors.transparent,
-                          width: 2,
-                        ),
                       ),
                     ),
                   );
