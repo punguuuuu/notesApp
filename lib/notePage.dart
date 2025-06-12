@@ -7,7 +7,9 @@ Future<void> updateNote({
   required String docId,
   required String title,
   required String description,
+  required List<Stroke> strokes,
 }) async {
+  final drawingData = strokes.map((s) => s.toMap()).toList();
   try {
     await FirebaseFirestore.instance
         .collection('notes')
@@ -16,6 +18,7 @@ Future<void> updateNote({
       'title': title,
       'titleLower': title.toLowerCase(),
       'description': description,
+      'content': drawingData,
       'timestamp': Timestamp.now(),
     });
     print('Document updated successfully');
@@ -38,6 +41,16 @@ Future<void> deleteNote({
   }
 }
 
+Future<List<Stroke>> loadDrawingData(String docId) async {
+  final doc = await FirebaseFirestore.instance.collection('notes').doc(docId).get();
+  final data = doc.data();
+  if (data == null) return [];
+
+  final content = data['content'] as List<dynamic>? ?? [];
+
+  return content.map((strokeMap) => Stroke.fromMap(strokeMap)).toList();
+}
+
 class NotePage extends StatefulWidget {
   const NotePage({super.key});
 
@@ -48,12 +61,28 @@ class NotePage extends StatefulWidget {
 class NotePageState extends State<NotePage> {
   late TextEditingController titleController;
   late TextEditingController descriptionController;
+  late DrawingController drawingController;
 
   bool isDrawing = false;
 
   void toggleTheme() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     themeNotifier.value = isDark ? ThemeMode.light : ThemeMode.dark;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    drawingController = DrawingController();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ?? {};
+      final docId = args['docId'] ?? '';
+      final strokes = await loadDrawingData(docId);
+      setState(() {
+        drawingController.strokes = strokes;
+      });
+    });
   }
 
   @override
@@ -86,7 +115,12 @@ class NotePageState extends State<NotePage> {
       appBar: AppBar(
         leading: IconButton(
           onPressed: () async {
-            await updateNote(docId: id, title: titleController.text, description: descriptionController.text);
+            await updateNote(
+              docId: id,
+              title: titleController.text,
+              description: descriptionController.text,
+              strokes: drawingController.strokes,
+            );
             Navigator.pop(context);
           },
           icon: const Icon(Icons.arrow_back_ios_rounded),
@@ -110,13 +144,19 @@ class NotePageState extends State<NotePage> {
           Padding(
             padding: EdgeInsets.only(right: 16),
             child: IconButton(onPressed: () async {
-              await updateNote(docId: id, title: titleController.text, description: descriptionController.text);
+              await updateNote(
+                  docId: id,
+                  title: titleController.text,
+                  description: descriptionController.text,
+                  strokes: drawingController.strokes,
+              );
             }, icon: Icon(Icons.save_outlined)),
           ),
         ],
       ),
       body: DrawingTextFieldOverlay(
         descriptionController: descriptionController,
+        drawingController: drawingController,
         isDark: Theme.of(context).brightness == Brightness.dark,
       ),
     );
@@ -125,11 +165,13 @@ class NotePageState extends State<NotePage> {
 
 class DrawingTextFieldOverlay extends StatefulWidget {
   final TextEditingController descriptionController;
+  final DrawingController drawingController;
   final bool isDark;
 
   const DrawingTextFieldOverlay({
     super.key,
     required this.descriptionController,
+    required this.drawingController,
     this.isDark = false,
   });
 
@@ -143,10 +185,6 @@ class _DrawingTextFieldOverlayState extends State<DrawingTextFieldOverlay> {
   bool isDrawing = false;
   bool isChangingColor = false;
   bool isChangingSize = false;
-
-  List<Stroke> strokes = [];
-  List<Stroke> redoStrokes = [];
-  List<Offset> currentPoints = [];
 
   Color selectedColor = Colors.black;
   double brushSize = 3.0;
@@ -187,47 +225,37 @@ class _DrawingTextFieldOverlayState extends State<DrawingTextFieldOverlay> {
             onPanStart: (details) {
               final box = _paintKey.currentContext?.findRenderObject();
               if (box is! RenderBox) return;
-
               final local = box.globalToLocal(details.globalPosition);
               setState(() {
-                currentPoints = [local];
+                widget.drawingController.currentPoints = [local];
               });
             },
             onPanUpdate: (details) {
-              final context = _paintKey.currentContext;
-              if (context == null) return;
-              final renderObject = context.findRenderObject();
-              if (renderObject is! RenderBox) return;
-
-              final local = renderObject.globalToLocal(details.globalPosition);
+              final box = _paintKey.currentContext?.findRenderObject();
+              if (box is! RenderBox) return;
+              final local = box.globalToLocal(details.globalPosition);
               setState(() {
-                currentPoints.add(local);
+                widget.drawingController.addPoint(local);
               });
             },
             onPanEnd: (_) {
-              if (currentPoints.isEmpty) return;
               setState(() {
-                strokes.add(Stroke(
-                  points: List.from(currentPoints),
-                  color: selectedColor,
-                  strokeWidth: brushSize,
-                ));
-                currentPoints.clear();
-                redoStrokes.clear();
+                widget.drawingController.endStroke(selectedColor, brushSize);
               });
             },
+
             child: CustomPaint(
               key: _paintKey,
               painter: DrawingPainter(
-                strokes: strokes,
-                currentPoints: currentPoints,
+                strokes: widget.drawingController.strokes,
+                currentPoints: widget.drawingController.currentPoints,
                 currentColor: selectedColor,
                 currentStrokeWidth: brushSize,
               ),
-              child: SizedBox.expand(
-                child: Container(color: Colors.transparent),
+              child: const SizedBox.expand(
+                child: ColoredBox(color: Colors.transparent),
               ),
-            ),
+            )
           ),
         ),
 
@@ -261,31 +289,23 @@ class _DrawingTextFieldOverlayState extends State<DrawingTextFieldOverlay> {
                   icon: const Icon(Icons.undo),
                   onPressed: () {
                     setState(() {
-                      if (strokes.isNotEmpty) {
-                        setState(() {
-                          redoStrokes.add(strokes.removeLast());
-                        });
-                      }
+                      widget.drawingController.undo();
                     });
                   },
                 ),
                 IconButton(
                   icon: const Icon(Icons.redo),
                   onPressed: () {
-                    if (redoStrokes.isNotEmpty) {
-                      setState(() {
-                        strokes.add(redoStrokes.removeLast());
-                      });
-                    }
+                    setState(() {
+                      widget.drawingController.redo();
+                    });
                   },
                 ),
                 IconButton(
                   icon: const Icon(Icons.refresh),
                   onPressed: () {
                     setState(() {
-                      currentPoints.clear();
-                      strokes.clear();
-                      redoStrokes.clear();
+                      widget.drawingController.clear();
                     });
                   },
                 ),
@@ -386,6 +406,64 @@ class Stroke {
   final double strokeWidth;
 
   Stroke({required this.points, required this.color, required this.strokeWidth});
+
+  Map<String, dynamic> toMap() {
+    return {
+      'points': points.map((p) => {'x': p.dx, 'y': p.dy}).toList(),
+      'color': color.value,
+      'strokeWidth': strokeWidth,
+    };
+  }
+
+  static Stroke fromMap(Map<String, dynamic> map) {
+    return Stroke(
+      points: (map['points'] as List)
+          .map((p) => Offset(p['x'] * 1.0, p['y'] * 1.0))
+          .toList(),
+      color: Color(map['color']),
+      strokeWidth: (map['strokeWidth'] as num).toDouble(),
+    );
+  }
+}
+
+class DrawingController {
+  List<Stroke> strokes = [];
+  List<Stroke> redoStrokes = [];
+  List<Offset> currentPoints = [];
+
+  void addPoint(Offset point) {
+    currentPoints.add(point);
+  }
+
+  void endStroke(Color color, double strokeWidth) {
+    if (currentPoints.isNotEmpty) {
+      strokes.add(Stroke(
+        points: List.from(currentPoints),
+        color: color,
+        strokeWidth: strokeWidth,
+      ));
+      currentPoints.clear();
+      redoStrokes.clear();
+    }
+  }
+
+  void undo() {
+    if (strokes.isNotEmpty) {
+      redoStrokes.add(strokes.removeLast());
+    }
+  }
+
+  void redo() {
+    if (redoStrokes.isNotEmpty) {
+      strokes.add(redoStrokes.removeLast());
+    }
+  }
+
+  void clear() {
+    strokes.clear();
+    redoStrokes.clear();
+    currentPoints.clear();
+  }
 }
 
 class DrawingPainter extends CustomPainter {
