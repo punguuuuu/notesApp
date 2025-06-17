@@ -221,6 +221,21 @@ class HomeBodyState extends State<HomeBody> {
   }
 }
 
+List<Stroke> parseStrokes(dynamic data) {
+  if (data == null) return [];
+
+  return (data as List).map((stroke) {
+    final points = (stroke['points'] as List).map((p) {
+      return Offset(p['dx'] * 1.0, p['dy'] * 1.0);
+    }).toList();
+
+    return Stroke(
+      points: points,
+      color: Color(int.parse(stroke['color'].substring(1, 7), radix: 16) + 0xFF000000),
+      strokeWidth: (stroke['width'] as num).toDouble(),
+    );
+  }).toList();
+}
 
 class PressableGridItem extends StatelessWidget {
   final DocumentSnapshot doc;
@@ -267,23 +282,45 @@ class PressableGridItem extends StatelessWidget {
             onTap: () {
               Navigator.pushNamed(context, '/NotePage', arguments: {
                 'title': title,
-                'titleLower':title.toLowerCase(),
+                'titleLower': title.toLowerCase(),
                 'description': description,
                 'docId': doc.id,
               });
             },
-            child: Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: isDark ? Colors.black26 : Colors.grey[200],
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text(description, textAlign: TextAlign.center),
-                ),
-              ),
+            child: FutureBuilder<List<Stroke>>(
+              future: loadDrawingData(doc.id),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                }
+
+                final strokes = snapshot.data ?? [];
+
+                return Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.black26 : Colors.grey[200],
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Stack(
+                    children: [
+                      // Drawing
+                      Positioned.fill(
+                        child: CustomPaint(
+                          painter: DrawingPainter(strokes: strokes),
+                        ),
+                      ),
+                      // Description text
+                      Positioned.fill(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Text(description),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           ),
         ),

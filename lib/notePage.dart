@@ -463,40 +463,63 @@ class DrawingController {
 
 class DrawingPainter extends CustomPainter {
   final List<Stroke> strokes;
-  final List<Offset> currentPoints;
-  final Color currentColor;
-  final double currentStrokeWidth;
+  final List<Offset>? currentPoints;
+  final Color? currentColor;
+  final double? currentStrokeWidth;
 
   DrawingPainter({
     required this.strokes,
-    required this.currentPoints,
-    required this.currentColor,
-    required this.currentStrokeWidth,
+    this.currentPoints,
+    this.currentColor,
+    this.currentStrokeWidth,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    for (var stroke in strokes) {
+    const originalWidth = 360.0;
+    const originalHeight = 800.0;
+
+    final scaleX = size.width / originalWidth;
+    final scaleY = size.height / originalHeight;
+
+    final scale = scaleX < scaleY ? scaleX : scaleY;
+
+    final offsetX = (size.width - originalWidth * scale) / 2;
+    final offsetY = (size.height - originalHeight * scale) / 2;
+
+    canvas.save();
+    canvas.translate(offsetX, offsetY);
+    canvas.scale(scale);
+
+    for (final stroke in strokes) {
       final paint = Paint()
         ..color = stroke.color
         ..strokeWidth = stroke.strokeWidth
         ..strokeCap = StrokeCap.round;
 
       for (int i = 0; i < stroke.points.length - 1; i++) {
-        canvas.drawLine(stroke.points[i], stroke.points[i + 1], paint);
+        final p1 = stroke.points[i];
+        final p2 = stroke.points[i + 1];
+        canvas.drawLine(p1, p2, paint);
       }
     }
 
-    if (currentPoints.length > 1) {
+    if (currentPoints != null &&
+        currentColor != null &&
+        currentStrokeWidth != null) {
       final paint = Paint()
-        ..color = currentColor
-        ..strokeWidth = currentStrokeWidth
+        ..color = currentColor!
+        ..strokeWidth = currentStrokeWidth!
         ..strokeCap = StrokeCap.round;
 
-      for (int i = 0; i < currentPoints.length - 1; i++) {
-        canvas.drawLine(currentPoints[i], currentPoints[i + 1], paint);
+      for (int i = 0; i < currentPoints!.length - 1; i++) {
+        final p1 = currentPoints![i];
+        final p2 = currentPoints![i + 1];
+        canvas.drawLine(p1, p2, paint);
       }
     }
+
+    canvas.restore();
   }
 
   @override
